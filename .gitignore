@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Environment variables and API keys
+.env
+
+# SQLite database files
+*.db
+*.sqlite3
