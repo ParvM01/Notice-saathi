@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "NoticeSaathi",
+  "version": "1.0.0",
+  "description": "JEE Main updates ko simple Hinglish mein samjhein.",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "NoticeSaathi"
+  }
+}
