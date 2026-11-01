@@ -1,10 +1,11 @@
 from flask import Flask, jsonify, request
 
-from scraper import fetch_notices
+from scraper import fetch_notices, fetch_notice_hash
+
 from database import (
     CATEGORIES,
     initialize_database,
-    save_notice,
+    record_notice_check,
     get_all_notices,
     get_preferences,
     save_preferences
@@ -117,7 +118,6 @@ def update_preferences():
 @app.route("/my-notices")
 def get_my_notices():
     selected_categories = get_preferences()
-
     all_notices = get_all_notices()
 
     matching_notices = [
@@ -136,21 +136,48 @@ def get_my_notices():
 def check_updates():
     latest_notices = fetch_notices()
 
-    new_count = 0
+    if not latest_notices:
+        return jsonify({
+            "error": "Could not retrieve notices from the official website.",
+            "total_found": 0
+        }), 502
+
+    counts = {
+        "new_notices": 0,
+        "updated_notices": 0,
+        "baseline_created": 0,
+        "unchanged_notices": 0,
+        "hash_unavailable": 0
+    }
 
     for notice in latest_notices:
-        is_new = save_notice(
+        content_hash = fetch_notice_hash(notice["url"])
+
+        status = record_notice_check(
             notice["title"],
-            notice["url"]
+            notice["url"],
+            content_hash
         )
 
-        if is_new:
-            new_count += 1
+        if status == "new":
+            counts["new_notices"] += 1
+
+        elif status == "updated":
+            counts["updated_notices"] += 1
+
+        elif status == "baseline":
+            counts["baseline_created"] += 1
+
+        elif status == "unchanged":
+            counts["unchanged_notices"] += 1
+
+        elif status == "unavailable":
+            counts["hash_unavailable"] += 1
 
     return jsonify({
         "message": "Notice check completed!",
         "total_found": len(latest_notices),
-        "new_notices": new_count
+        **counts
     })
 
 

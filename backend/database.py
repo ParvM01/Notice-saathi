@@ -93,6 +93,12 @@ def initialize_database():
             ADD COLUMN category TEXT DEFAULT 'general'
         """)
 
+    if "content_hash" not in columns:
+        cursor.execute("""
+            ALTER TABLE notices
+            ADD COLUMN content_hash TEXT
+        """)
+
     rows = cursor.execute(
         "SELECT id, title FROM notices"
     ).fetchall()
@@ -105,7 +111,6 @@ def initialize_database():
             (category, row["id"])
         )
 
-    # Store the student's selected notice categories.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS preferences (
             id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -113,15 +118,68 @@ def initialize_database():
         )
     """)
 
-    # Create default preferences only if none exist.
     cursor.execute("""
         INSERT OR IGNORE INTO preferences
         (id, selected_categories)
         VALUES (1, ?)
-    """, ("application,admit_card,exam_city,answer_key,result,correction,schedule",))
+    """, (
+        "application,admit_card,exam_city,answer_key,result,correction,schedule",
+    ))
 
     connection.commit()
     connection.close()
+
+
+def record_notice_check(title, url, content_hash):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    category = classify_notice(title)
+
+    cursor.execute(
+        "SELECT id, content_hash FROM notices WHERE url = ?",
+        (url,)
+    )
+
+    existing = cursor.fetchone()
+
+    if existing is None:
+        cursor.execute("""
+            INSERT INTO notices
+            (title, url, category, content_hash)
+            VALUES (?, ?, ?, ?)
+        """, (title, url, category, content_hash))
+
+        status = "new"
+
+    elif content_hash is None:
+        status = "unavailable"
+
+    elif existing["content_hash"] is None:
+        cursor.execute("""
+            UPDATE notices
+            SET content_hash = ?
+            WHERE id = ?
+        """, (content_hash, existing["id"]))
+
+        status = "baseline"
+
+    elif existing["content_hash"] != content_hash:
+        cursor.execute("""
+            UPDATE notices
+            SET content_hash = ?
+            WHERE id = ?
+        """, (content_hash, existing["id"]))
+
+        status = "updated"
+
+    else:
+        status = "unchanged"
+
+    connection.commit()
+    connection.close()
+
+    return status
 
 
 def save_notice(title, url):
