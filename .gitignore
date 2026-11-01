@@ -1,12 +1,5 @@
-# Python
-__pycache__/
-*.pyc
-venv/
 .venv/
-
-# Environment variables and API keys
+__pycache__/
+*.py[cod]
 .env
-
-# SQLite database files
-*.db
-*.sqlite3
+backend/notices.db
