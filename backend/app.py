@@ -12,7 +12,12 @@ from database import (
     record_notice_check,
     get_all_notices,
     get_preferences,
-    save_preferences
+    save_preferences,
+    get_notification_events,
+    mark_notification_event_read,
+    save_monitoring_run,
+    get_latest_monitoring_run,
+    get_monitoring_history
 )
 
 app = Flask(__name__)
@@ -31,7 +36,9 @@ def enable_extension_cors(response):
 
     if origin.startswith("chrome-extension://"):
         response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Methods"] = (
+            "GET, POST, OPTIONS"
+        )
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
         response.headers["Vary"] = "Origin"
 
@@ -40,57 +47,96 @@ def enable_extension_cors(response):
 
 def run_notice_check():
     with check_lock:
-        latest_notices = fetch_notices()
+        try:
+            latest_notices = fetch_notices()
 
-        if not latest_notices:
-            logging.error("Could not retrieve official JEE Main notices.")
+            if not latest_notices:
+                error_message = (
+                    "Could not retrieve notices from the official website."
+                )
 
-            return {
-                "error": "Could not retrieve notices from the official website.",
+                result = {
+                    "error": error_message,
+                    "total_found": 0
+                }
+
+                save_monitoring_run(
+                    result,
+                    status="failed",
+                    error_message=error_message
+                )
+
+                logging.error(error_message)
+                return result
+
+            counts = {
+                "new_notices": 0,
+                "updated_notices": 0,
+                "baseline_created": 0,
+                "unchanged_notices": 0,
+                "hash_unavailable": 0
+            }
+
+            for notice in latest_notices:
+                content_hash = fetch_notice_hash(notice["url"])
+
+                status = record_notice_check(
+                    notice["title"],
+                    notice["url"],
+                    content_hash
+                )
+
+                if status == "new":
+                    counts["new_notices"] += 1
+                elif status == "updated":
+                    counts["updated_notices"] += 1
+                elif status == "baseline":
+                    counts["baseline_created"] += 1
+                elif status == "unchanged":
+                    counts["unchanged_notices"] += 1
+                elif status == "unavailable":
+                    counts["hash_unavailable"] += 1
+
+            result = {
+                "message": "Notice check completed!",
+                "total_found": len(latest_notices),
+                **counts
+            }
+
+            if counts["hash_unavailable"] > 0:
+                result["warning"] = (
+                    "Some notice files could not be checked. "
+                    "The monitoring run completed partially."
+                )
+                run_status = "partial"
+            else:
+                run_status = "success"
+
+            save_monitoring_run(result, status=run_status)
+
+            logging.info("Notice monitoring result: %s", result)
+            return result
+
+        except Exception as error:
+            logging.exception("Notice monitoring failed")
+
+            result = {
+                "error": (
+                    "An unexpected error occurred during notice monitoring."
+                ),
                 "total_found": 0
             }
 
-        counts = {
-            "new_notices": 0,
-            "updated_notices": 0,
-            "baseline_created": 0,
-            "unchanged_notices": 0,
-            "hash_unavailable": 0
-        }
+            try:
+                save_monitoring_run(
+                    result,
+                    status="failed",
+                    error_message=str(error)
+                )
+            except Exception:
+                logging.exception("Could not save failed monitoring run")
 
-        for notice in latest_notices:
-            content_hash = fetch_notice_hash(notice["url"])
-
-            status = record_notice_check(
-                notice["title"],
-                notice["url"],
-                content_hash
-            )
-
-            if status == "new":
-                counts["new_notices"] += 1
-
-            elif status == "updated":
-                counts["updated_notices"] += 1
-
-            elif status == "baseline":
-                counts["baseline_created"] += 1
-
-            elif status == "unchanged":
-                counts["unchanged_notices"] += 1
-
-            elif status == "unavailable":
-                counts["hash_unavailable"] += 1
-
-        result = {
-            "message": "Notice check completed!",
-            "total_found": len(latest_notices),
-            **counts
-        }
-
-        logging.info("Notice monitoring result: %s", result)
-
-        return result
+            return result
 
 
 @app.route("/")
@@ -119,7 +165,6 @@ def get_notices():
 
     if category:
         category = category.strip().lower()
-
         valid_categories = list(CATEGORIES.keys()) + ["general"]
 
         if category not in valid_categories:
@@ -219,6 +264,66 @@ def check_updates():
     return jsonify(result)
 
 
+@app.route("/notification-events", methods=["GET"])
+def read_notification_events():
+    unread_only = (
+        request.args.get("unread_only", "false").lower()
+        == "true"
+    )
+
+    personalized_only = (
+        request.args.get("personalized_only", "false").lower()
+        == "true"
+    )
+
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        return jsonify({
+            "error": "limit must be a number"
+        }), 400
+
+    limit = max(1, min(limit, 100))
+
+    selected_categories = (
+        get_preferences() if personalized_only else None
+    )
+
+    events = get_notification_events(
+        unread_only=unread_only,
+        limit=limit,
+        categories=selected_categories
+    )
+
+    return jsonify({
+        "total": len(events),
+        "unread_only": unread_only,
+        "personalized_only": personalized_only,
+        "selected_categories": (
+            selected_categories if personalized_only else None
+        ),
+        "events": events
+    })
+
+
+@app.route(
+    "/notification-events/<int:event_id>/read",
+    methods=["POST"]
+)
+def mark_event_read(event_id):
+    updated = mark_notification_event_read(event_id)
+
+    if not updated:
+        return jsonify({
+            "error": "Notification event not found"
+        }), 404
+
+    return jsonify({
+        "message": "Notification marked as read",
+        "event_id": event_id
+    })
+
+
 @app.route("/scheduler-status")
 def scheduler_status():
     job = scheduler.get_job("notice_monitor")
@@ -226,12 +331,46 @@ def scheduler_status():
     return jsonify({
         "scheduler_running": scheduler.running,
         "monitoring_interval_minutes": 15,
-        "next_check": job.next_run_time.isoformat() if job else None
+        "next_check": (
+            job.next_run_time.isoformat() if job else None
+        )
+    })
+
+
+@app.route("/monitoring-status")
+def monitoring_status():
+    latest_run = get_latest_monitoring_run()
+    job = scheduler.get_job("notice_monitor")
+
+    return jsonify({
+        "scheduler_running": scheduler.running,
+        "monitoring_interval_minutes": 15,
+        "next_scheduled_check": (
+            job.next_run_time.isoformat() if job else None
+        ),
+        "last_run": latest_run
+    })
+
+
+@app.route("/monitoring-history")
+def monitoring_history():
+    try:
+        limit = int(request.args.get("limit", 10))
+    except ValueError:
+        return jsonify({
+            "error": "limit must be a number"
+        }), 400
+
+    limit = max(1, min(limit, 50))
+    history = get_monitoring_history(limit)
+
+    return jsonify({
+        "total": len(history),
+        "history": history
     })
 
 
 if __name__ == "__main__":
-
     scheduler.add_job(
         run_notice_check,
         trigger="interval",
@@ -244,7 +383,9 @@ if __name__ == "__main__":
 
     scheduler.start()
 
-    logging.info("Automatic JEE Main monitoring started (every 15 minutes).")
+    logging.info(
+        "Automatic JEE Main monitoring started (every 15 minutes)."
+    )
 
     try:
         app.run(
