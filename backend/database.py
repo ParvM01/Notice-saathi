@@ -1,4 +1,3 @@
-
 import sqlite3
 from pathlib import Path
 
@@ -106,6 +105,21 @@ def initialize_database():
             (category, row["id"])
         )
 
+    # Store the student's selected notice categories.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS preferences (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            selected_categories TEXT NOT NULL
+        )
+    """)
+
+    # Create default preferences only if none exist.
+    cursor.execute("""
+        INSERT OR IGNORE INTO preferences
+        (id, selected_categories)
+        VALUES (1, ?)
+    """, ("application,admit_card,exam_city,answer_key,result,correction,schedule",))
+
     connection.commit()
     connection.close()
 
@@ -152,6 +166,45 @@ def get_all_notices(category=None):
     connection.close()
 
     return notices
+
+
+def get_preferences():
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT selected_categories
+        FROM preferences
+        WHERE id = 1
+    """)
+
+    row = cursor.fetchone()
+    connection.close()
+
+    if row is None:
+        return []
+
+    return [
+        category
+        for category in row["selected_categories"].split(",")
+        if category
+    ]
+
+
+def save_preferences(categories):
+    connection = get_connection()
+
+    selected_categories = ",".join(categories)
+
+    connection.execute("""
+        INSERT INTO preferences (id, selected_categories)
+        VALUES (1, ?)
+        ON CONFLICT(id) DO UPDATE SET
+        selected_categories = excluded.selected_categories
+    """, (selected_categories,))
+
+    connection.commit()
+    connection.close()
 
 
 if __name__ == "__main__":
