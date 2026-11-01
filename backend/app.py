@@ -1,7 +1,9 @@
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+
 from scraper import fetch_notices
 from database import (
+    CATEGORIES,
     initialize_database,
     save_notice,
     get_all_notices
@@ -9,7 +11,7 @@ from database import (
 
 app = Flask(__name__)
 
-# Create database when the server starts
+# Initialise database when the server starts
 initialize_database()
 
 
@@ -17,16 +19,42 @@ initialize_database()
 def home():
     return jsonify({
         "message": "NoticeSaathi Backend is running!",
-        "project": "JEE Main Notice Monitor"
+        "project": "JEE Main Notice Monitor",
+        "status": "active"
+    })
+
+
+@app.route("/categories")
+def get_categories():
+    categories = list(CATEGORIES.keys())
+    categories.append("general")
+
+    return jsonify({
+        "total": len(categories),
+        "categories": categories
     })
 
 
 @app.route("/notices")
 def get_notices():
-    notices = get_all_notices()
+    category = request.args.get("category")
+
+    if category:
+        category = category.strip().lower()
+
+        valid_categories = list(CATEGORIES.keys()) + ["general"]
+
+        if category not in valid_categories:
+            return jsonify({
+                "error": "Invalid category",
+                "valid_categories": valid_categories
+            }), 400
+
+    notices = get_all_notices(category)
 
     return jsonify({
         "total": len(notices),
+        "category": category or "all",
         "notices": notices
     })
 
