@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from scraper import fetch_notices, fetch_notice_hash
+from ai_explainer import generate_notice_explanation
 
 from database import (
     CATEGORIES,
@@ -252,6 +253,53 @@ def get_my_notices():
         "selected_categories": selected_categories,
         "notices": matching_notices
     })
+
+
+@app.route("/explain-notice", methods=["POST"])
+def explain_notice():
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "error": "Request must contain JSON data"
+        }), 400
+
+    notice_id = data.get("notice_id")
+
+    if (
+        not isinstance(notice_id, int)
+        or isinstance(notice_id, bool)
+        or notice_id <= 0
+    ):
+        return jsonify({
+            "error": "notice_id must be a positive integer"
+        }), 400
+
+    notices = get_all_notices()
+
+    notice = next(
+        (
+            item for item in notices
+            if item["id"] == notice_id
+        ),
+        None
+    )
+
+    if notice is None:
+        return jsonify({
+            "error": "Notice not found"
+        }), 404
+
+    try:
+        explanation = generate_notice_explanation(notice)
+        return jsonify(explanation)
+
+    except Exception:
+        logging.exception("Notice explanation failed")
+
+        return jsonify({
+            "error": "Could not generate notice explanation"
+        }), 500
 
 
 @app.route("/check-updates", methods=["POST"])

@@ -10,27 +10,23 @@ The Flask backend must be running before using these APIs.
 
 GET /
 
-Checks whether the backend is running.
-
 ## 2. Get categories
 
 GET /categories
 
-Returns all supported JEE Main notice categories.
-
-## 3. Get all notices
+## 3. Get notices
 
 GET /notices
 
-Optional category filter:
+Optional filter:
 
 GET /notices?category=admit_card
 
-## 4. Get student-specific notices
+## 4. Get personalized notices
 
 GET /my-notices
 
-Returns notices matching the student's saved category preferences.
+Returns notices matching saved category preferences.
 
 ## 5. Get preferences
 
@@ -42,7 +38,7 @@ POST /preferences
 
 Content-Type: application/json
 
-Example body:
+Example:
 
 {
   "categories": ["result", "admit_card"]
@@ -58,13 +54,32 @@ Supported categories:
 - correction
 - schedule
 
-## 7. Manually check for updates
+## 7. Explain a notice (temporary mock mode)
+
+POST /explain-notice
+
+Content-Type: application/json
+
+Example:
+
+{
+  "notice_id": 1
+}
+
+Returns a structured Hinglish preview.
+
+IMPORTANT:
+- The current implementation uses mock mode.
+- It does not analyse the actual PDF or notice contents.
+- Gemini integration is pending.
+- The response includes is_ai_generated: false.
+- Always show the original official notice URL.
+
+## 8. Manually check for updates
 
 POST /check-updates
 
-Starts a manual check of the official JEE Main notices.
-
-## 8. Get notification events
+## 9. Get notification events
 
 GET /notification-events
 
@@ -78,37 +93,29 @@ Example:
 
 GET /notification-events?unread_only=true&personalized_only=true
 
-Returns new and updated notice events.
-
-## 9. Mark notification as read
+## 10. Mark notification as read
 
 POST /notification-events/1/read
 
 Replace 1 with the notification event ID.
 
-## 10. Get scheduler status
+## 11. Scheduler status
 
 GET /scheduler-status
 
-Returns whether automatic monitoring is running and the next scheduled check.
-
-## 11. Get latest monitoring status
+## 12. Latest monitoring status
 
 GET /monitoring-status
 
-Returns the latest monitoring run and scheduler information.
-
-## 12. Get monitoring history
+## 13. Monitoring history
 
 GET /monitoring-history
 
-Optional parameter:
+Optional:
 
 GET /monitoring-history?limit=10
 
 ## Notice object
-
-A notice contains:
 
 - id
 - title
@@ -118,23 +125,21 @@ A notice contains:
 
 ## Notification event object
 
-An event contains:
-
 - id
 - notice_id
-- event_type (new or updated)
+- event_type
 - detected_at
 - is_read
 - title
 - url
 - category
 
-## Important integration notes
+## Integration notes
 
-- Use the backend base URL above during local development.
+- Keep the backend running during local extension testing.
 - The extension should use POST for /check-updates.
-- The extension can use personalized_only=true to retrieve only events matching saved preferences.
-- Always show the original notice URL so students can verify official information.
-- Do not expose any future AI API key in extension JavaScript.
-- The AI explanation feature is not yet implemented in this backend.
-- For local testing, the backend must remain running.
+- Use personalized_only=true for personalized notification events.
+- Never expose an AI API key in extension JavaScript.
+- Store future Gemini credentials in backend environment variables.
+- The current explanation endpoint is a mock preview, not a real AI feature.
+- The actual notice PDF must be analysed before providing reliable AI explanations.
