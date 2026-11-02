@@ -1,11 +1,13 @@
 import logging
 import threading
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from scraper import fetch_notices, fetch_notice_hash
 from ai_explainer import generate_notice_explanation
+
+from simulation_demo import initialize_simulation, get_demo_notices, update_demo_notice, get_demo_events
 
 from database import (
     CATEGORIES,
@@ -26,6 +28,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 initialize_database()
+initialize_simulation()
 
 scheduler = BackgroundScheduler()
 check_lock = threading.Lock()
@@ -417,6 +420,32 @@ def monitoring_history():
         "history": history
     })
 
+
+
+@app.route("/simulation")
+def judge_simulation_page():
+    return render_template("simulation.html")
+
+
+@app.route("/api/simulation/notices", methods=["GET"])
+def simulation_notices():
+    return jsonify({"notices": get_demo_notices()})
+
+
+@app.route("/api/simulation/notices/<category>", methods=["POST"])
+def amend_simulation_notice(category):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or "content" not in data:
+        return jsonify({"error": "Send JSON with a content field"}), 400
+    try:
+        return jsonify(update_demo_notice(category, data["content"]))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@app.route("/api/simulation/events", methods=["GET"])
+def simulation_events():
+    return jsonify({"events": get_demo_events()})
 
 if __name__ == "__main__":
     scheduler.add_job(
