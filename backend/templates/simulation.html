@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoticeSaathi | Judge Simulation</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fb;color:#172033;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1050px;margin:auto;padding:22px}.hero{background:#142b50;color:white;padding:24px;border-radius:18px}.hero h1{margin:0 0 8px}.hero p{margin:0;color:#d8e4f6}.tag{display:inline-block;background:#ffe7a8;color:#503900;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:700;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;margin-top:18px}.card,.events{background:white;border:1px solid #dce3ee;border-radius:14px;padding:16px;box-shadow:0 3px 12px #15294b0a}.card h2{font-size:17px;margin:0 0 10px;text-transform:capitalize}.card textarea{width:100%;min-height:190px;border:1px solid #cbd5e1;border-radius:9px;padding:11px;font:14px/1.5 system-ui;resize:vertical}.actions{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}button{border:0;border-radius:9px;background:#1558ad;color:white;font-weight:700;padding:10px 15px;cursor:pointer}.status{font-size:13px;color:#475569}.events{margin-top:20px}.events h2{margin:0 0 10px}.event{padding:10px 0;border-top:1px solid #e5eaf1;font-size:14px}.muted{color:#64748b;font-size:13px}@media(max-width:500px){.wrap{padding:12px}.hero{padding:18px}}
+</style></head>
+<body><main class="wrap">
+<section class="hero"><span class="tag">PRESENTATION MODE · DEMO DATA</span><h1>NoticeSaathi — Judge Simulation</h1><p>Edit any notice below and publish your own amendment. The system compares the saved content with its previous version; no field or amendment is preselected.</p></section>
+<section class="grid" id="notices"><p>Loading editable notices…</p></section>
+<section class="events"><h2>Detected amendments</h2><p class="muted">Substantive text or number changes appear here. Formatting, capitalization, and punctuation-only edits are ignored.</p><div id="events" class="muted">No amendments yet.</div></section>
+</main>
+<script>
+const categories=['application','admit_card','exam_city','answer_key','result','correction','schedule'];
+async function load(){const r=await fetch('/api/simulation/notices');const d=await r.json();const root=document.getElementById('notices');root.innerHTML='';for(const n of d.notices){const card=document.createElement('article');card.className='card';const h=document.createElement('h2');h.textContent=n.category.replaceAll('_',' ');const ta=document.createElement('textarea');ta.value=n.content;ta.id='content-'+n.category;const actions=document.createElement('div');actions.className='actions';const b=document.createElement('button');b.textContent='Publish amendment';b.onclick=()=>publish(n.category);const s=document.createElement('span');s.className='status';s.id='status-'+n.category;actions.append(b,s);card.append(h,ta,actions);root.append(card)}await loadEvents()}
+async function publish(category){const content=document.getElementById('content-'+category).value;const status=document.getElementById('status-'+category);status.textContent='Saving…';try{const r=await fetch('/api/simulation/notices/'+category,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not save');status.textContent=d.message;await loadEvents()}catch(e){status.textContent='Error: '+e.message}}
+async function loadEvents(){const r=await fetch('/api/simulation/events');const d=await r.json();const root=document.getElementById('events');if(!d.events.length){root.textContent='No amendments yet.';return}root.innerHTML='';for(const e of d.events){const div=document.createElement('div');div.className='event';div.textContent=e.title+' — '+e.event_type+' · '+e.detected_at;root.append(div)}}
+load().catch(e=>{document.getElementById('notices').textContent='Could not load simulation: '+e.message});
+</script></body></html>
