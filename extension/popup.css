@@ -76,3 +76,57 @@ button:hover {
   font-size: 13px;
   text-align: center;
 }
+hr {
+  margin: 22px 0;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.notice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notice-heading button {
+  width: auto;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.notice-card {
+  margin: 12px 0;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.notice-card h3 {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.notice-card p {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.notice-card a {
+  display: block;
+  margin-top: 12px;
+  color: #15803d;
+  font-size: 13px;
+}
+
+.explanation {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
