@@ -7,34 +7,24 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-
   <div class="container">
     <h1>NoticeSaathi</h1>
-
-    <p class="subtitle">
-      JEE Main updates, ab simple shabdo mein.
-    </p>
+    <p class="subtitle">JEE Main updates, ab simple shabdo mein.</p>
 
     <h2>Kaunse updates track karne hain?</h2>
-
-    <label>
-      <input type="checkbox" value="public-notices">
-      Public Notices
-    </label>
-
-    <label>
-      <input type="checkbox" value="important-dates">
-      Important Dates
-    </label>
-
-    <label>
-      <input type="checkbox" value="announcements">
-      Announcements
-    </label>
+    <div id="categories">Loading categories...</div>
 
     <button id="saveButton">Save Preferences</button>
-
     <p id="statusMessage"></p>
+
+    <hr>
+
+    <div class="notice-heading">
+      <h2>Latest Notices</h2>
+      <button id="refreshButton">Refresh</button>
+    </div>
+
+    <div id="notices">Loading notices...</div>
   </div>
 
   <script src="popup.js"></script>
